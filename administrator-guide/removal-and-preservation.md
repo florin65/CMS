@@ -45,9 +45,11 @@ Save logs:
 ```bash
 mkdir -p "/root/${MODULE}-remove"
 
-cp -a "/var/log/lunar/install/${MODULE}-${VERSION}"   "/root/${MODULE}-remove/install-log"
+cp -a "/var/log/lunar/install/${MODULE}-${VERSION}" \
+  "/root/${MODULE}-remove/install-log"
 
-cp -a "/var/log/lunar/md5sum/${MODULE}-${VERSION}"   "/root/${MODULE}-remove/md5sum-log" 2>/dev/null || true
+cp -a "/var/log/lunar/md5sum/${MODULE}-${VERSION}" \
+  "/root/${MODULE}-remove/md5sum-log" 2>/dev/null || true
 ```
 
 Module-specific logs may disappear during removal.
@@ -154,7 +156,8 @@ Inspect the activity log and actual payload before deciding whether the manifest
 Before deleting a suspicious remaining path:
 
 ```bash
-grep -R -F -x '/path'   /var/log/lunar/install 2>/dev/null
+grep -R -F -x '/path' \
+  /var/log/lunar/install 2>/dev/null
 ```
 
 Multiple matches may indicate intentional sharing, a provider transition, stale state, or a packaging error.

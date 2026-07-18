@@ -46,9 +46,12 @@ mkdir -p "$BASE"
 cp -a /var/state/lunar/packages "$BASE/packages.before"
 cp -a /var/state/lunar/depends "$BASE/depends.before"
 
-grep "^${MODULE}:" /var/state/lunar/packages   > "$BASE/package-record.before" || true
+grep "^${MODULE}:" /var/state/lunar/packages \
+  > "$BASE/package-record.before" || true
 
-grep -E "^${MODULE}:|^[^:]+:${MODULE}:"   /var/state/lunar/depends   > "$BASE/depends-records.before" || true
+grep -E "^${MODULE}:|^[^:]+:${MODULE}:" \
+  /var/state/lunar/depends \
+  > "$BASE/depends-records.before" || true
 
 cp -a /var/log/lunar/install/${MODULE}-* "$BASE/" 2>/dev/null || true
 cp -a /var/log/lunar/md5sum/${MODULE}-* "$BASE/" 2>/dev/null || true
@@ -285,9 +288,11 @@ Manual editing is a last resort.
 Before editing:
 
 ```bash
-cp -a /var/state/lunar/packages   /root/packages.pre-manual-repair
+cp -a /var/state/lunar/packages \
+  /root/packages.pre-manual-repair
 
-cp -a /var/state/lunar/depends   /root/depends.pre-manual-repair
+cp -a /var/state/lunar/depends \
+  /root/depends.pre-manual-repair
 ```
 
 A valid manual repair requires:
@@ -303,9 +308,11 @@ A valid manual repair requires:
 After each major repair step:
 
 ```bash
-cp -a /var/state/lunar/packages   "$BASE/packages.checkpoint-N"
+cp -a /var/state/lunar/packages \
+  "$BASE/packages.checkpoint-N"
 
-cp -a /var/state/lunar/depends   "$BASE/depends.checkpoint-N"
+cp -a /var/state/lunar/depends \
+  "$BASE/depends.checkpoint-N"
 ```
 
 Do not perform several major repairs without intermediate checkpoints.
@@ -315,7 +322,8 @@ Do not perform several major repairs without intermediate checkpoints.
 Check installed records without matching manifests:
 
 ```bash
-awk -F: '$3 ~ /installed/ {print $1 ":" $4}'   /var/state/lunar/packages |
+awk -F: '$3 ~ /installed/ {print $1 ":" $4}' \
+  /var/state/lunar/packages |
 while IFS=: read -r module version; do
   test -f "/var/log/lunar/install/${module}-${version}" ||
     echo "missing manifest: ${module}-${version}"
@@ -351,7 +359,8 @@ cat /var/log/lunar/install/module-version
 Check dependency state:
 
 ```bash
-grep -E '^module:|^[^:]+:module:'   /var/state/lunar/depends
+grep -E '^module:|^[^:]+:module:' \
+  /var/state/lunar/depends
 ```
 
 Check payload and runtime:
