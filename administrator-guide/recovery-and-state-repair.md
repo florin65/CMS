@@ -1,0 +1,262 @@
+---
+title: "Recovery and State Repair"
+description: "A conservative method for repairing inconsistent LSS state."
+---
+
+# Recovery and State Repair
+
+LSS recovery means restoring agreement between several layers:
+
+```text
+Moonbase
+→ intended module behavior
+
+/var/state/lunar/packages
+→ package and policy state
+
+/var/state/lunar/depends
+→ dependency relationships
+
+/var/log/lunar/install
+→ final ownership
+
+/var/log/lunar/md5sum
+→ installed checksums
+
+filesystem
+→ physical payload
+
+runtime
+→ actual functionality
+```
+
+Repairing only the visible symptom can leave the system inconsistent.
+
+## Preserve evidence first
+
+Before changing anything:
+
+```bash
+MODULE=name
+VERSION=$(lvu installed "$MODULE")
+BASE=/root/lss-recovery/$MODULE
+
+mkdir -p "$BASE"
+
+cp -a /var/state/lunar/packages "$BASE/packages.before"
+cp -a /var/state/lunar/depends "$BASE/depends.before"
+
+grep "^${MODULE}:" /var/state/lunar/packages \
+  > "$BASE/package-record.before" || true
+
+grep -E "^${MODULE}:|^[^:]+:${MODULE}:" \
+  /var/state/lunar/depends \
+  > "$BASE/depends-records.before" || true
+
+cp -a /var/log/lunar/install/${MODULE}-* "$BASE/" 2>/dev/null || true
+cp -a /var/log/lunar/md5sum/${MODULE}-* "$BASE/" 2>/dev/null || true
+cp -a /var/log/lunar/compile/${MODULE}-* "$BASE/" 2>/dev/null || true
+```
+
+Also preserve the active module definition and Moonbase revision when possible.
+
+## Inconsistency matrix
+
+### Package record present, payload missing
+
+Likely causes:
+
+- manual deletion;
+- filesystem damage;
+- interrupted replacement;
+- restored state database without payload.
+
+Preferred repair:
+
+```text
+preserve evidence
+→ rebuild or reinstall
+→ regenerate payload and logs
+→ verify runtime
+```
+
+Do not delete the package record merely to make the database resemble the damaged filesystem.
+
+### Package record present, manifest missing
+
+The module is recorded as installed, but LSS has lost its primary ownership record.
+
+Preferred repair:
+
+```text
+rebuild or reinstall the same configuration
+→ regenerate install and MD5 logs
+→ compare the resulting payload
+→ verify state
+```
+
+Avoid normal removal until ownership has been restored.
+
+### Manifest present, package record missing
+
+Possible causes:
+
+- interrupted removal;
+- manual state edit;
+- stale log;
+- partial recovery.
+
+Inspect:
+
+```bash
+grep "$MODULE" /var/log/lunar/activity
+```
+
+Then compare the manifest with the actual filesystem. Do not assume either layer is automatically correct.
+
+### Payload present without ownership
+
+Possible causes:
+
+- manual installation;
+- preserved configuration;
+- partial failed operation;
+- external installer;
+- files left by a hook or service.
+
+Search existing ownership:
+
+```bash
+grep -R -F -x '/path' /var/log/lunar/install 2>/dev/null
+```
+
+Do not assign ownership by guesswork.
+
+### Dependency record references a missing module
+
+Inspect the dependent module's `DEPENDS`, `CONFIGURE`, and `OPTIONS` files.
+
+Preferred repair:
+
+```text
+reconfigure or rebuild the dependent module
+→ regenerate dependency state
+→ verify the relationship
+```
+
+Deleting one line from `/var/state/lunar/depends` may hide the problem without restoring the intended configuration.
+
+### Preserved configuration remains after removal
+
+This may be correct when a locally modified `/etc` file survives with `PRESERVE=on`.
+
+Such a file is local orphaned state:
+
+```text
+present on disk
+→ no longer owned by an installed module
+```
+
+Keep, archive, compare, or remove it deliberately.
+
+## Preferred repair order
+
+Use the least invasive supported path:
+
+```text
+1. rebuild
+2. reinstall
+3. restore through a verified cache
+4. rollback from a coherent backup or snapshot
+5. narrowly scoped manual repair
+```
+
+A supported rebuild or reinstall can restore payload, ownership, checksums, package state, and dependency state together.
+
+## Interrupted rebuild
+
+Possible state:
+
+```text
+old payload partly removed
+new payload incomplete
+final manifest absent
+old cache still available
+package record stale or missing
+```
+
+Response:
+
+1. stop further updates;
+2. preserve console, compile, activity, and state evidence;
+3. determine whether the old or new payload remains;
+4. use a trusted cache or known-good module definition;
+5. reinstall;
+6. verify ownership and runtime before continuing.
+
+## Interrupted removal
+
+Possible state:
+
+```text
+package record removed
+some payload remains
+module logs partly removed
+modified configuration remains
+```
+
+Use the surviving manifest, a saved manifest, a trusted cache, or a test reinstall to reconstruct ownership. Avoid broad manual deletion.
+
+## Manual state repair
+
+Manual editing is a last resort.
+
+Before editing:
+
+```bash
+cp -a /var/state/lunar/packages \
+  /root/packages.pre-manual-repair
+
+cp -a /var/state/lunar/depends \
+  /root/depends.pre-manual-repair
+```
+
+A valid manual repair requires:
+
+- a documented source for each reconstructed value;
+- one narrowly scoped change;
+- preservation of `held`, `exiled`, and `enforced` policy;
+- immediate before/after comparison;
+- filesystem and runtime verification.
+
+## Verification after repair
+
+Check package state:
+
+```bash
+grep '^module:' /var/state/lunar/packages
+lvu installed module
+```
+
+Check ownership:
+
+```bash
+cat /var/log/lunar/install/module-version
+```
+
+Check dependency state:
+
+```bash
+grep -E '^module:|^[^:]+:module:' \
+  /var/state/lunar/depends
+```
+
+Check payload and runtime:
+
+```bash
+command -v program
+ldd /usr/bin/program
+program --version
+```
+
+A repair is complete only when state, ownership, filesystem, and runtime agree.
